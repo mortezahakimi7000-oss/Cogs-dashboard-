@@ -65,8 +65,14 @@ async function refresh(){
   if(API_URL.includes('PASTE_')) throw Error('API not configured');
   const r = await fetch(API_URL);
 const result = await r.json();
-const rows = result.data || [];
-
+data = (result.data || []).map(row => ({
+product: row.product || '',
+grade: row.grade || '',
+unit: row.unit || '',
+cogs: Number(row.cogs) || 0,
+currency: row.currency || '',
+updated: row.updated || ''
+}));
 data = rows.slice(1).map(row => ({
 product: row[0],
 grade: row[2],
