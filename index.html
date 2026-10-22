@@ -52,6 +52,7 @@ async function refresh(){
   const response=await fetch(API_URL,{cache:'no-store'});
   if(!response.ok) throw new Error('HTTP '+response.status);
   const result=await response.json();
+  document.getElementById('status').textContent = JSON.stringify(result);
   if(!Array.isArray(result.data)) throw new Error('Unexpected response format');
   data=result.data.map(x=>({product:x.product||'',grade:x.grade||'',cogs:Number(x.cogs)||0,currency:x.currency||'',unit:x.unit||'',updated:x.updated||''})).filter(x=>x.product);
   status.textContent=`Live data loaded (${data.length} item${data.length===1?'':'s'}).`;
