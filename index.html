@@ -6,59 +6,195 @@
 <title>COGS Dashboard</title>
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--text:#17202a;--muted:#6b7280;--accent:#f28c28;--line:#e5e7eb}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Inter,Arial,sans-serif;color:var(--text)}
-header{background:#20252b;color:#fff;padding:28px 20px}header .wrap,main{max-width:1050px;margin:auto}
-h1{margin:0;font-size:28px}header p{margin:7px 0 0;color:#cbd0d6}
-main{padding:24px 20px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
-input,select,button{font:inherit}input,select{border:1px solid var(--line);border-radius:9px;padding:11px 12px;background:white}
-#search{flex:1;min-width:220px}button{border:0;border-radius:9px;padding:11px 15px;cursor:pointer;background:var(--accent);color:#fff;font-weight:700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font-family:Inter,Arial,sans-serif;color:var(--text)}
+header{background:#20252b;color:#fff;padding:28px 20px}
+header .wrap,main{max-width:1050px;margin:auto}
+h1{margin:0;font-size:28px}
+header p{margin:7px 0 0;color:#cbd0d6}
+main{padding:24px 20px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+input,button{font:inherit}
+input{border:1px solid var(--line);border-radius:9px;padding:11px 12px;background:white}
+#search{flex:1;min-width:220px}
+button{border:0;border-radius:9px;padding:11px 15px;cursor:pointer;background:var(--accent);color:#fff;font-weight:700}
 button.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px}
 .cardhead{padding:16px 18px;border-bottom:1px solid var(--line);font-weight:800;display:flex;justify-content:space-between}
-table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:13px 15px;border-bottom:1px solid var(--line);font-size:14px}th{font-size:12px;text-transform:uppercase;color:var(--muted);background:#fafafa}tr:last-child td{border-bottom:0}
-.price{font-weight:800}.updated{color:var(--muted);font-size:12px}.empty{padding:30px;text-align:center;color:var(--muted)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:13px 15px;border-bottom:1px solid var(--line);font-size:14px}
+th{font-size:12px;text-transform:uppercase;color:var(--muted);background:#fafafa}
+tr:last-child td{border-bottom:0}
+.price{font-weight:800}
+.updated{color:var(--muted);font-size:12px}
+.empty{padding:30px;text-align:center;color:var(--muted)}
 .notice{padding:12px 14px;background:#fff8ef;border:1px solid #f5d4ad;border-radius:10px;color:#6b4a22;margin-bottom:18px;font-size:13px}
+.login{background:white;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+.loginrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+#password{flex:1;min-width:220px}
 @media(max-width:720px){th:nth-child(4),td:nth-child(4){display:none}}
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>COGS Dashboard</h1><p>Live product cost reference</p></div></header>
+<header><div class="wrap">
+<h1>COGS Dashboard</h1>
+<p>Live product cost reference</p>
+</div></header>
+
 <main>
-<div class="toolbar"><input id="search" placeholder="Search product or grade…"><button class="secondary" onclick="refresh()">Refresh</button></div>
-<div id="status" class="notice">Loading current COGS…</div><div id="list"></div>
+<div class="login">
+<label for="password"><strong>Shared dashboard password</strong></label>
+<div class="loginrow">
+<input id="password" type="password" autocomplete="current-password" placeholder="Enter password">
+<button id="unlock">Unlock dashboard</button>
+</div>
+</div>
+
+<div class="toolbar">
+<input id="search" placeholder="Search product or grade…" disabled>
+<button id="refresh" class="secondary" disabled>Refresh</button>
+<button id="logout" class="secondary" hidden>Lock dashboard</button>
+</div>
+
+<div id="status" class="notice">Enter the shared password to access COGS data.</div>
+<div id="list"></div>
 </main>
+
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycby4yJrnubxdpRdQT4rCAmVYY1skAOu-5cqVwemA8BTPDwZcGadKD3tgMAFp1iUX0ILNvA/exec";
+
 let data = [];
+let dashboardPassword = "";
+
 const fmt = x => Number(x || 0).toLocaleString(undefined,{maximumFractionDigits:2});
-function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+
+function esc(s){
+return String(s ?? '').replace(/[&<>"']/g,m=>({
+'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+}[m]));
+}
+
 function render(){
- const q=document.getElementById('search').value.toLowerCase();
- const filtered=data.filter(x=>(String(x.product||'')+" "+String(x.grade||'')+" "+String(x.unit||'')).toLowerCase().includes(q));
- const groups={}; filtered.forEach(x=>(groups[x.product]??=[]).push(x));
- const box=document.getElementById('list'); box.innerHTML='';
- if(!filtered.length){box.innerHTML='<div class="empty">No products found.</div>';return}
- for(const [product,items] of Object.entries(groups)){
-  const c=document.createElement('div');c.className='card';
-  c.innerHTML=`<div class="cardhead"><span>${esc(product)}</span><span class="updated">${items.length} item${items.length>1?'s':''}</span></div>
-  <table><thead><tr><th>Grade / Size</th><th>COGS</th><th>Currency</th><th>Unit</th><th>Updated</th></tr></thead><tbody>
-  ${items.map(x=>`<tr><td>${esc(x.grade)}</td><td class="price">${fmt(x.cogs)}</td><td>${esc(x.currency)}</td><td>${esc(x.unit)}</td><td class="updated">${esc(x.updated||'')}</td></tr>`).join('')}
-  </tbody></table>`;box.appendChild(c);
- }
+const q=document.getElementById('search').value.toLowerCase();
+const filtered=data.filter(x=>
+(String(x.product||'')+" "+String(x.grade||'')+" "+String(x.unit||'')).toLowerCase().includes(q)
+);
+const groups={};
+filtered.forEach(x=>(groups[x.product]??=[]).push(x));
+const box=document.getElementById('list');
+box.innerHTML='';
+
+if(!filtered.length){
+box.innerHTML='<div class="empty">No products found.</div>';
+return;
 }
+
+for(const [product,items] of Object.entries(groups)){
+const c=document.createElement('div');
+c.className='card';
+c.innerHTML=`
+<div class="cardhead">
+<span>${esc(product)}</span>
+<span class="updated">${items.length} item${items.length===1?'':'s'}</span>
+</div>
+<table>
+<thead><tr><th>Grade / Size</th><th>COGS</th><th>Currency</th><th>Unit</th><th>Updated</th></tr></thead>
+<tbody>${items.map(x=>`
+<tr>
+<td>${esc(x.grade)}</td>
+<td class="price">${fmt(x.cogs)}</td>
+<td>${esc(x.currency)}</td>
+<td>${esc(x.unit)}</td>
+<td class="updated">${esc(x.updated||'')}</td>
+</tr>`).join('')}
+</tbody>
+</table>`;
+box.appendChild(c);
+}
+}
+
 async function refresh(){
- const status=document.getElementById('status');status.textContent='Loading live data…';
- try{
-  const response=await fetch(API_URL,{cache:'no-store'});
-  if(!response.ok) throw new Error('HTTP '+response.status);
-  const result=await response.json();
-  document.getElementById('status').textContent = JSON.stringify(result);
-  if(!Array.isArray(result.data)) throw new Error('Unexpected response format');
-  data=result.data.slice(1).map(row=>({product:row[0]||'',grade:row[2]||'',cogs:Number(row[4])||0,currency:row[5]||'',unit:row[3]||'',updated:row[6]||''})).filter(x=>x.product);
-  status.textContent=`Live data loaded (${data.length} item${data.length===1?'':'s'}).`;
- }catch(error){data=[];status.textContent='Could not load live data. Check the Apps Script deployment and internet connection, then tap Refresh.'}
- render();
+const status=document.getElementById('status');
+
+if(!dashboardPassword){
+status.textContent='Enter the shared password to access COGS data.';
+return;
 }
-document.getElementById('search').addEventListener('input',render);refresh();
+
+status.textContent='Checking password and loading data…';
+
+try{
+const response=await fetch(API_URL,{
+method:'POST',
+headers:{'Content-Type':'text/plain;charset=UTF-8'},
+body:JSON.stringify({action:'read',password:dashboardPassword}),
+cache:'no-store'
+});
+
+const result=await response.json();
+
+if(!result.success || !Array.isArray(result.data)){
+data=[];
+dashboardPassword='';
+setUnlocked(false);
+status.textContent='Password rejected. Please enter the correct password.';
+render();
+return;
+}
+
+data=result.data.map(x=>({
+product:x.product||'',
+grade:x.grade||'',
+cogs:Number(x.cogs)||0,
+currency:x.currency||'',
+unit:x.unit||'',
+updated:x.updated||''
+})).filter(x=>x.product);
+
+setUnlocked(true);
+status.textContent=`Live data loaded (${data.length} item${data.length===1?'':'s'}).`;
+}catch(error){
+data=[];
+status.textContent='Connection failed. Check the Apps Script deployment and try again.';
+}
+
+render();
+}
+
+function setUnlocked(unlocked){
+document.getElementById('search').disabled=!unlocked;
+document.getElementById('refresh').disabled=!unlocked;
+document.getElementById('logout').hidden=!unlocked;
+}
+
+function login(){
+const p=document.getElementById('password').value;
+if(!p){
+document.getElementById('status').textContent='Please enter the shared password.';
+return;
+}
+dashboardPassword=p;
+refresh();
+}
+
+function logout(){
+dashboardPassword='';
+data=[];
+document.getElementById('password').value='';
+document.getElementById('search').value='';
+setUnlocked(false);
+document.getElementById('status').textContent='Dashboard locked. Enter the shared password to continue.';
+document.getElementById('list').innerHTML='';
+}
+
+document.getElementById('unlock').addEventListener('click',login);
+document.getElementById('refresh').addEventListener('click',refresh);
+document.getElementById('logout').addEventListener('click',logout);
+document.getElementById('search').addEventListener('input',render);
+document.getElementById('password').addEventListener('keydown',e=>{
+if(e.key==='Enter') login();
+});
 </script>
-</body></html>
+</body>
+</html>
+
